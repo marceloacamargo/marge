@@ -9,7 +9,9 @@
       "Bash(gh repo create:*)",
       "Bash(git remote add:*)",
       "Bash(git push:*)",
-      "WebFetch(domain:marge-5q2yqyjtx-marcelos-projects-c5873dc1.vercel.app)"
+      "WebFetch(domain:marge-5q2yqyjtx-marcelos-projects-c5873dc1.vercel.app)",
+      "Bash(npm run dev:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

@@ -11,6 +11,8 @@ const MARGE_SYSTEM_PROMPT = `
 You are Marge, a professional and warm AI receptionist for a {business_type} business called {business_name}.
 Your personality: Professional but warm, helpful, and efficient. You have a friendly, caring demeanor that puts clients at ease.
 
+IMPORTANT: Today's date is {current_date}. Always use this as reference for scheduling and availability checks.
+
 Your capabilities:
 1. Schedule appointments (1-hour slots)
 2. Check availability
@@ -18,11 +20,13 @@ Your capabilities:
 4. Answer basic questions about the business
 
 Booking rules:
-- Appointments can be booked up to 30 days in advance
+- Appointments can be booked up to 30 days in advance from today ({current_date})
 - Minimum 4 hours notice required for new bookings
 - Business hours: {business_hours}
 - All appointments are 1 hour long
 - Only one appointment per time slot
+- When clients ask for "today", use {current_date}
+- When clients ask for "tomorrow", use the day after {current_date}
 
 When scheduling:
 1. Always ask for the client's preferred date first
@@ -46,91 +50,106 @@ export async function handleChatMessage(
   context: ChatMessage[],
   businessInfo: Business
 ) {
-  const functions = [
+  const tools = [
     {
-      name: "check_availability",
-      description: "Check available appointment slots for a specific date",
-      parameters: {
-        type: "object",
-        properties: {
-          date: { 
-            type: "string", 
-            description: "Date in YYYY-MM-DD format" 
+      type: "function" as const,
+      function: {
+        name: "check_availability",
+        description: "Check available appointment slots for a specific date",
+        parameters: {
+          type: "object",
+          properties: {
+            date: { 
+              type: "string", 
+              description: "Date in YYYY-MM-DD format" 
+            },
+            time_preference: { 
+              type: "string", 
+              enum: ["morning", "afternoon", "evening", "any"],
+              description: "Preferred time of day"
+            }
           },
-          time_preference: { 
-            type: "string", 
-            enum: ["morning", "afternoon", "evening", "any"],
-            description: "Preferred time of day"
-          }
-        },
-        required: ["date"]
+          required: ["date"]
+        }
       }
     },
     {
-      name: "book_appointment",
-      description: "Book an appointment for a client",
-      parameters: {
-        type: "object",
-        properties: {
-          date: { 
-            type: "string",
-            description: "Date in YYYY-MM-DD format"
+      type: "function" as const,
+      function: {
+        name: "book_appointment",
+        description: "Book an appointment for a client",
+        parameters: {
+          type: "object",
+          properties: {
+            date: { 
+              type: "string",
+              description: "Date in YYYY-MM-DD format"
+            },
+            time: { 
+              type: "string",
+              description: "Time in HH:MM format"
+            },
+            client_name: { 
+              type: "string",
+              description: "Client's full name"
+            },
+            client_email: { 
+              type: "string",
+              description: "Client's email address"
+            },
+            client_phone: { 
+              type: "string",
+              description: "Client's phone number (optional)"
+            }
           },
-          time: { 
-            type: "string",
-            description: "Time in HH:MM format"
-          },
-          client_name: { 
-            type: "string",
-            description: "Client's full name"
-          },
-          client_email: { 
-            type: "string",
-            description: "Client's email address"
-          },
-          client_phone: { 
-            type: "string",
-            description: "Client's phone number (optional)"
-          }
-        },
-        required: ["date", "time", "client_name", "client_email"]
+          required: ["date", "time", "client_name", "client_email"]
+        }
       }
     },
     {
-      name: "cancel_appointment",
-      description: "Cancel an existing appointment",
-      parameters: {
-        type: "object",
-        properties: {
-          client_email: { 
-            type: "string",
-            description: "Client's email address to find the appointment"
+      type: "function" as const,
+      function: {
+        name: "cancel_appointment",
+        description: "Cancel an existing appointment",
+        parameters: {
+          type: "object",
+          properties: {
+            client_email: { 
+              type: "string",
+              description: "Client's email address to find the appointment"
+            },
+            appointment_id: { 
+              type: "string",
+              description: "Specific appointment ID if known"
+            }
           },
-          appointment_id: { 
-            type: "string",
-            description: "Specific appointment ID if known"
-          }
-        },
-        required: ["client_email"]
+          required: ["client_email"]
+        }
       }
     },
     {
-      name: "find_client_appointments",
-      description: "Find existing appointments for a client",
-      parameters: {
-        type: "object",
-        properties: {
-          client_email: { 
-            type: "string",
-            description: "Client's email address"
-          }
-        },
-        required: ["client_email"]
+      type: "function" as const,
+      function: {
+        name: "find_client_appointments",
+        description: "Find existing appointments for a client",
+        parameters: {
+          type: "object",
+          properties: {
+            client_email: { 
+              type: "string",
+              description: "Client's email address"
+            }
+          },
+          required: ["client_email"]
+        }
       }
     }
   ];
 
+  const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  
   const systemPrompt = MARGE_SYSTEM_PROMPT
+    .replace(/{current_date}/g, currentDate)
     .replace("{business_type}", businessInfo.type === 'healthcare' ? 'healthcare' : 'beauty and wellness')
     .replace("{business_name}", businessInfo.name)
     .replace("{business_hours}", formatBusinessHours(businessInfo.business_hours))
@@ -158,10 +177,10 @@ export async function handleChatMessage(
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "gpt-4o",
       messages,
-      functions,
-      function_call: "auto",
+      tools,
+      tool_choice: "auto",
       temperature: 0.7,
       max_tokens: 500
     });

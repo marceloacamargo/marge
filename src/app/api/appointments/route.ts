@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { BookingService } from '@/lib/booking-logic';
+import { GetAppointmentsSchema, CreateAppointmentSchema, UpdateAppointmentSchema, validateRequest, parseQueryParams } from '@/lib/validation';
 
 // GET /api/appointments - Get appointments for a business
 export async function GET(request: NextRequest) {
@@ -12,17 +13,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const searchParams = request.nextUrl.searchParams;
-    const businessId = searchParams.get('businessId');
-    const date = searchParams.get('date');
-    const status = searchParams.get('status');
-
-    if (!businessId) {
-      return NextResponse.json(
-        { error: 'Business ID is required' },
-        { status: 400 }
-      );
-    }
+    // Validate query parameters
+    const queryParams = parseQueryParams(request.url);
+    const validatedParams = validateRequest(GetAppointmentsSchema, queryParams);
+    const { businessId, date, status } = validatedParams;
 
     let query = supabaseAdmin
       .from('appointments')
@@ -71,14 +65,10 @@ export async function GET(request: NextRequest) {
 // POST /api/appointments - Create new appointment
 export async function POST(request: NextRequest) {
   try {
-    const { businessId, date, time, clientName, clientEmail, clientPhone, notes } = await request.json();
-
-    if (!businessId || !date || !time || !clientName || !clientEmail) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    // Validate request data
+    const requestBody = await request.json();
+    const validatedData = validateRequest(CreateAppointmentSchema, requestBody);
+    const { businessId, date, time, clientName, clientEmail, clientPhone, notes } = validatedData;
 
     const result = await BookingService.bookAppointment(businessId, {
       date,
@@ -131,14 +121,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { id, status, notes, cancellationReason } = await request.json();
-
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Appointment ID is required' },
-        { status: 400 }
-      );
-    }
+    // Validate request data
+    const requestBody = await request.json();
+    const validatedData = validateRequest(UpdateAppointmentSchema, requestBody);
+    const { id, status, notes, cancellationReason } = validatedData;
 
     const updateData: Record<string, unknown> = {};
     

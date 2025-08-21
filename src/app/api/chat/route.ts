@@ -3,6 +3,7 @@ import { handleChatMessage } from '@/lib/chat-handler';
 import { BookingService } from '@/lib/booking-logic';
 import { supabaseAdmin } from '@/lib/supabase';
 import { Business } from '@/types';
+import { ChatRequestSchema, validateRequest } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   console.log('=== Chat API Request Started ===');
@@ -11,15 +12,9 @@ export async function POST(request: NextRequest) {
     const requestBody = await request.json();
     console.log('Request body:', JSON.stringify(requestBody, null, 2));
     
-    const { message, context, businessId } = requestBody;
-
-    if (!message || !businessId) {
-      console.error('Missing required fields:', { message: !!message, businessId: !!businessId });
-      return NextResponse.json(
-        { error: 'Message and businessId are required' },
-        { status: 400 }
-      );
-    }
+    // Validate request data
+    const validatedData = validateRequest(ChatRequestSchema, requestBody);
+    const { message, context, businessId } = validatedData;
 
     // Check environment variables
     console.log('Environment check:', {
@@ -72,18 +67,20 @@ export async function POST(request: NextRequest) {
         hasResponse: !!response,
         hasChoices: !!response?.choices?.length,
         firstChoiceContent: response?.choices?.[0]?.message?.content?.substring(0, 100),
-        hasFunctionCall: !!response?.choices?.[0]?.message?.function_call
+        hasToolCalls: !!response?.choices?.[0]?.message?.tool_calls?.length
       });
     
       const choice = response.choices[0];
       let responseMessage = choice.message?.content || "I'm sorry, I couldn't understand that. Could you please rephrase?";
 
-      // Handle function calls
-      if (choice.message?.function_call) {
-        console.log('Function call detected:', choice.message.function_call.name);
-        const functionName = choice.message.function_call.name;
-        const functionArgs = JSON.parse(choice.message.function_call.arguments || '{}');
-        console.log('Function arguments:', functionArgs);
+      // Handle tool calls (new API format)
+      if (choice.message?.tool_calls && choice.message.tool_calls.length > 0) {
+        const toolCall = choice.message.tool_calls[0];
+        if (toolCall.type === 'function') {
+          console.log('Tool call detected:', toolCall.function.name);
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments || '{}');
+          console.log('Function arguments:', functionArgs);
 
         let functionResult;
 
@@ -157,8 +154,9 @@ export async function POST(request: NextRequest) {
           }
           break;
 
-        default:
-          responseMessage = "I'm sorry, I couldn't process that request. How else can I help you?";
+          default:
+            responseMessage = "I'm sorry, I couldn't process that request. How else can I help you?";
+        }
       }
     }
 
@@ -179,8 +177,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Chat API general error:', error);
+    
+    // Handle validation errors specifically
+    if (error instanceof Error && error.message.includes('Validation error')) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: error.message },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
