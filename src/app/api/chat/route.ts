@@ -5,23 +5,40 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { Business } from '@/types';
 
 export async function POST(request: NextRequest) {
+  console.log('=== Chat API Request Started ===');
+  
   try {
-    const { message, context, businessId } = await request.json();
+    const requestBody = await request.json();
+    console.log('Request body:', JSON.stringify(requestBody, null, 2));
+    
+    const { message, context, businessId } = requestBody;
 
     if (!message || !businessId) {
+      console.error('Missing required fields:', { message: !!message, businessId: !!businessId });
       return NextResponse.json(
         { error: 'Message and businessId are required' },
         { status: 400 }
       );
     }
 
+    // Check environment variables
+    console.log('Environment check:', {
+      hasOpenAI: !!process.env.OPENAI_API_KEY,
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasSupabaseAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      hasSupabaseServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
+    });
+
     // Get business information
     if (!supabaseAdmin) {
+      console.error('supabaseAdmin is null - database not configured');
       return NextResponse.json(
         { error: 'Database not configured' },
         { status: 503 }
       );
     }
+
+    console.log('Fetching business information for ID:', businessId);
 
     const { data: business, error: businessError } = await supabaseAdmin
       .from('businesses')
@@ -29,27 +46,48 @@ export async function POST(request: NextRequest) {
       .eq('id', businessId)
       .single();
 
-    if (businessError || !business) {
+    if (businessError) {
+      console.error('Business query error:', businessError);
+      return NextResponse.json(
+        { error: 'Business not found', details: businessError.message },
+        { status: 404 }
+      );
+    }
+
+    if (!business) {
+      console.error('No business found with ID:', businessId);
       return NextResponse.json(
         { error: 'Business not found' },
         { status: 404 }
       );
     }
 
+    console.log('Business found:', { id: business.id, name: business.name, type: business.type });
+
     // Process message with OpenAI
-    const response = await handleChatMessage(message, context || [], business as Business);
+    console.log('Processing message with OpenAI...');
+    try {
+      const response = await handleChatMessage(message, context || [], business as Business);
+      console.log('OpenAI response received:', {
+        hasResponse: !!response,
+        hasChoices: !!response?.choices?.length,
+        firstChoiceContent: response?.choices?.[0]?.message?.content?.substring(0, 100),
+        hasFunctionCall: !!response?.choices?.[0]?.message?.function_call
+      });
     
-    const choice = response.choices[0];
-    let responseMessage = choice.message?.content || "I'm sorry, I couldn't understand that. Could you please rephrase?";
+      const choice = response.choices[0];
+      let responseMessage = choice.message?.content || "I'm sorry, I couldn't understand that. Could you please rephrase?";
 
-    // Handle function calls
-    if (choice.message?.function_call) {
-      const functionName = choice.message.function_call.name;
-      const functionArgs = JSON.parse(choice.message.function_call.arguments || '{}');
+      // Handle function calls
+      if (choice.message?.function_call) {
+        console.log('Function call detected:', choice.message.function_call.name);
+        const functionName = choice.message.function_call.name;
+        const functionArgs = JSON.parse(choice.message.function_call.arguments || '{}');
+        console.log('Function arguments:', functionArgs);
 
-      let functionResult;
+        let functionResult;
 
-      switch (functionName) {
+        switch (functionName) {
         case 'check_availability':
           const slots = await BookingService.getAvailableSlots(
             businessId,
@@ -124,15 +162,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Chat session storage could be implemented here if needed
-    // await supabaseAdmin.from('chat_sessions').insert(...)
+      // Chat session storage could be implemented here if needed
+      // await supabaseAdmin.from('chat_sessions').insert(...)
 
-    return NextResponse.json({ message: responseMessage });
+      console.log('Final response message:', responseMessage);
+      console.log('=== Chat API Request Completed Successfully ===');
+      return NextResponse.json({ message: responseMessage });
+
+    } catch (openaiError) {
+      console.error('OpenAI processing error:', openaiError);
+      return NextResponse.json(
+        { error: 'AI service temporarily unavailable', details: openaiError instanceof Error ? openaiError.message : 'Unknown OpenAI error' },
+        { status: 503 }
+      );
+    }
 
   } catch (error) {
-    console.error('Chat API error:', error);
+    console.error('Chat API general error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

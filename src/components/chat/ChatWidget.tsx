@@ -51,6 +51,8 @@ export default function ChatWidget({ businessId }: ChatWidgetProps) {
     setIsLoading(true);
 
     try {
+      console.log('Sending chat message:', { message: input.trim(), businessId });
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,11 +63,40 @@ export default function ChatWidget({ businessId }: ChatWidgetProps) {
         })
       });
 
+      console.log('Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('API error response:', errorData);
+        
+        let errorMessage = "I'm sorry, I'm having trouble right now. ";
+        
+        if (response.status === 404) {
+          errorMessage += "There seems to be a configuration issue. Please contact support.";
+        } else if (response.status === 503) {
+          if (errorData.error?.includes('Database')) {
+            errorMessage += "Our database is temporarily unavailable. Please try again in a few minutes.";
+          } else if (errorData.error?.includes('AI service')) {
+            errorMessage += "Our AI service is temporarily unavailable. Please try again in a few minutes.";
+          } else {
+            errorMessage += "Our services are temporarily unavailable. Please try again in a few minutes.";
+          }
+        } else if (response.status >= 500) {
+          errorMessage += "We're experiencing technical difficulties. Please try again or call us directly.";
+        } else {
+          errorMessage += "Please try again or call us directly for assistance.";
+        }
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: errorMessage,
+          timestamp: new Date().toISOString()
+        }]);
+        return;
       }
 
       const data = await response.json();
+      console.log('Successful response data:', data);
       
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -75,10 +106,15 @@ export default function ChatWidget({ businessId }: ChatWidgetProps) {
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error('Chat network error:', error);
+      
+      const errorMessage = error instanceof Error && error.message.includes('fetch')
+        ? "I'm having trouble connecting to our servers. Please check your internet connection and try again."
+        : "I'm sorry, I'm having trouble right now. Please try again or call us directly for assistance.";
+      
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: "I'm sorry, I'm having trouble right now. Please try again or call us directly for assistance.",
+        content: errorMessage,
         timestamp: new Date().toISOString()
       }]);
     } finally {
