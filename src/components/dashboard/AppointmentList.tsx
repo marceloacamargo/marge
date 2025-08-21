@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ export default function AppointmentList({ businessId, limit }: AppointmentListPr
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     try {
       const response = await fetch(`/api/appointments?businessId=${businessId}`);
       if (!response.ok) throw new Error('Failed to fetch appointments');
@@ -52,11 +52,11 @@ export default function AppointmentList({ businessId, limit }: AppointmentListPr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [businessId, limit]);
 
   useEffect(() => {
     fetchAppointments();
-  }, [businessId]);
+  }, [fetchAppointments]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

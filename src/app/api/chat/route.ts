@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleChatMessage } from '@/lib/chat-handler';
 import { BookingService } from '@/lib/booking-logic';
 import { supabaseAdmin } from '@/lib/supabase';
-import { Business, ChatMessage } from '@/types';
+import { Business } from '@/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +16,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get business information
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 503 }
+      );
+    }
+
     const { data: business, error: businessError } = await supabaseAdmin
       .from('businesses')
       .select('*')
@@ -117,26 +124,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Store chat session (optional - for analytics)
-    try {
-      const chatMessage: ChatMessage = {
-        role: 'user',
-        content: message,
-        timestamp: new Date().toISOString()
-      };
-
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: responseMessage,
-        timestamp: new Date().toISOString()
-      };
-
-      // You could store the chat session here if needed
-      // await supabaseAdmin.from('chat_sessions').insert(...)
-    } catch (error) {
-      console.warn('Failed to store chat session:', error);
-      // Don't fail the request if chat storage fails
-    }
+    // Chat session storage could be implemented here if needed
+    // await supabaseAdmin.from('chat_sessions').insert(...)
 
     return NextResponse.json({ message: responseMessage });
 

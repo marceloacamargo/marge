@@ -4,6 +4,13 @@ import { supabaseAdmin } from '@/lib/supabase';
 // GET /api/clients - Get clients for a business
 export async function GET(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 503 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const businessId = searchParams.get('businessId');
     const search = searchParams.get('search');
@@ -49,6 +56,13 @@ export async function GET(request: NextRequest) {
 // POST /api/clients - Create new client
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 503 }
+      );
+    }
+
     const { businessId, name, email, phone, notes } = await request.json();
 
     if (!businessId || !name || !email) {

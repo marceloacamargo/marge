@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,7 @@ export default function ClientList({ businessId, limit }: ClientListProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchClients = async (search?: string) => {
+  const fetchClients = useCallback(async (search?: string) => {
     try {
       const params = new URLSearchParams({ businessId });
       if (search) params.append('search', search);
@@ -48,11 +48,11 @@ export default function ClientList({ businessId, limit }: ClientListProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [businessId, limit]);
 
   useEffect(() => {
     fetchClients();
-  }, [businessId]);
+  }, [fetchClients]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -64,7 +64,7 @@ export default function ClientList({ businessId, limit }: ClientListProps) {
     }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [searchTerm]);
+  }, [searchTerm, fetchClients]);
 
   const getInitials = (name: string) => {
     return name

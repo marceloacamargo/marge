@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,7 @@ export default function CalendarView({ businessId }: CalendarViewProps) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchAppointments = async (date?: Date) => {
+  const fetchAppointments = useCallback(async (date?: Date) => {
     setIsLoading(true);
     try {
       const dateStr = date ? format(date, 'yyyy-MM-dd') : undefined;
@@ -36,11 +36,11 @@ export default function CalendarView({ businessId }: CalendarViewProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [businessId]);
 
   useEffect(() => {
     fetchAppointments(selectedDate);
-  }, [selectedDate, businessId]);
+  }, [selectedDate, fetchAppointments]);
 
   const selectedDateAppointments = appointments.filter(apt => 
     isSameDay(new Date(apt.date), selectedDate)

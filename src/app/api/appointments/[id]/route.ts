@@ -11,6 +11,13 @@ interface RouteContext {
 export async function GET(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 503 }
+      );
+    }
+
     const { data: appointment, error } = await supabaseAdmin
       .from('appointments')
       .select(`
@@ -48,6 +55,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 503 }
+      );
+    }
+
     const { error } = await supabaseAdmin
       .from('appointments')
       .delete()

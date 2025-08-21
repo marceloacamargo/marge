@@ -5,6 +5,13 @@ import { BookingService } from '@/lib/booking-logic';
 // GET /api/appointments - Get appointments for a business
 export async function GET(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 503 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const businessId = searchParams.get('businessId');
     const date = searchParams.get('date');
@@ -89,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Add notes if provided
-    if (notes && result.appointment) {
+    if (notes && result.appointment && supabaseAdmin) {
       const { error: updateError } = await supabaseAdmin
         .from('appointments')
         .update({ notes })
@@ -117,6 +124,13 @@ export async function POST(request: NextRequest) {
 // PUT /api/appointments - Update appointment
 export async function PUT(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 503 }
+      );
+    }
+
     const { id, status, notes, cancellationReason } = await request.json();
 
     if (!id) {

@@ -9,6 +9,11 @@ export class BookingService {
     date: string, 
     time: string
   ): Promise<boolean> {
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return false;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('appointments')
       .select('id')
@@ -31,6 +36,10 @@ export class BookingService {
     date: string,
     timePreference?: 'morning' | 'afternoon' | 'evening' | 'any'
   ): Promise<string[]> {
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return [];
+    }
     
     // Get business info to check business hours
     const { data: business, error: businessError } = await supabaseAdmin
@@ -116,6 +125,13 @@ export class BookingService {
   ): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
     
     try {
+      if (!supabaseAdmin) {
+        return {
+          success: false,
+          error: 'Database not configured'
+        };
+      }
+      
       // Check if time slot is still available
       const isAvailable = await this.isTimeSlotAvailable(
         businessId, 
@@ -188,6 +204,10 @@ export class BookingService {
     businessId: string,
     clientInfo: { name: string; email: string; phone?: string }
   ): Promise<Client | null> {
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return null;
+    }
     
     // Try to find existing client
     const { data: existingClient } = await supabaseAdmin
@@ -239,6 +259,11 @@ export class BookingService {
 
   // Update client statistics
   static async updateClientStats(clientId: string): Promise<void> {
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured');
+      return;
+    }
+    
     const { data: appointments } = await supabaseAdmin
       .from('appointments')
       .select('date')
@@ -265,6 +290,13 @@ export class BookingService {
   ): Promise<{ success: boolean; appointment?: Appointment; error?: string }> {
     
     try {
+      if (!supabaseAdmin) {
+        return {
+          success: false,
+          error: 'Database not configured'
+        };
+      }
+      
       let query = supabaseAdmin
         .from('appointments')
         .select('*, clients(*)')
@@ -352,6 +384,13 @@ export class BookingService {
   ): Promise<{ success: boolean; appointments?: Appointment[]; error?: string }> {
     
     try {
+      if (!supabaseAdmin) {
+        return {
+          success: false,
+          error: 'Database not configured'
+        };
+      }
+      
       // Find client first
       const { data: client } = await supabaseAdmin
         .from('clients')
