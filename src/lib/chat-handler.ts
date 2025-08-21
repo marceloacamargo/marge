@@ -1,9 +1,11 @@
 import OpenAI from 'openai';
 import { Business, ChatMessage } from '@/types';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openaiApiKey = process.env.OPENAI_API_KEY;
+
+const openai = openaiApiKey ? new OpenAI({
+  apiKey: openaiApiKey,
+}) : null;
 
 const MARGE_SYSTEM_PROMPT = `
 You are Marge, a professional and warm AI receptionist for a {business_type} business called {business_name}.
@@ -149,6 +151,10 @@ export async function handleChatMessage(
       content: message 
     }
   ];
+
+  if (!openai) {
+    throw new Error('OpenAI API key not configured');
+  }
 
   try {
     const response = await openai.chat.completions.create({
